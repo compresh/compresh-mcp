@@ -2,14 +2,19 @@
 
 Differences from open-source tulbase-mcp:
 
-    - Tier1Summarizer runs with ``protect_mode="balanced"`` by default,
-      with QMatrixClassifier + EpistemicClassifier injected from the
-      ``compresh_mcp.tul1`` namespace
     - On startup, validates COMPRESH_API_KEY against the Compresh
       production API
+    - Per turn, runs the open-source tulbase compression locally for
+      cold-storage + fetch_compressed support, AND calls the paid
+      ``/v1/tul1`` server endpoint for TUL 1.0 enhancement (Q-protective
+      ranking + epistemic markers). On network/server failure, falls
+      back to the local result silently.
     - Per-session saving telemetry is reported back asynchronously
       (best-effort; local compression never blocks on telemetry)
     - Session state persists in ``~/.compresh/storage/<session_id>/``
+
+Architecture change vs 0.1.0: TUL 1.0 layers moved server-side.
+See ``archive/0.1.0-tul1/README.md`` and CHANGELOG for context.
 """
 
 from __future__ import annotations
@@ -27,15 +32,15 @@ from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 
-# Pipeline + cold storage + compose use tulbase open-source core (PyPI/GitHub).
-# The Tier1Summarizer in upstream tulbase is the pre-protect_mode version;
-# we ship our own Q-protective summarizer inside compresh_mcp.tul1 and inject
-# it via Pipeline(summarizer=...).
+# tulbase (MIT, vendored as ``compresh_mcp.tulbase``) is the open-source
+# compression core — LexRank summarization, Protection Zone, cold storage,
+# modality elision. It runs locally on every turn for cold-storage support.
 from .tulbase import (  # type: ignore[import-not-found]
     ColdStorage,
     CompressionLog,
     Pipeline,
     Retriever,
+    Tier1Summarizer,
     compose_compresh_history,
 )
 
@@ -50,7 +55,12 @@ from .auth import (
     verify_api_key,
 )
 from .onboarding import show_welcome_and_open_signup
-from .tul1 import EpistemicClassifier, QMatrixClassifier, Tier1Summarizer
+from .tul1_client import (
+    Tul1NetworkError,
+    Tul1PaymentRequired,
+    Tul1ServerError,
+    call_v1_tul1,
+)
 
 logger = logging.getLogger("compresh-mcp")
 
@@ -117,18 +127,15 @@ class SessionState:
         self.log.ensure_schema()
         self.cold = ColdStorage(str(self.workdir / "cold"))
 
-        # Q-protective balanced — inject classifiers from compresh_mcp.tul1
-        # rather than relying on tulbase's auto-init (tulbase distribution
-        # does not include Q matrix / epistemic modules).
+        # Local pipeline runs the open-source tulbase core only — no Q-protective
+        # ranking, no epistemic markers, no semantic store. Those layers run on
+        # the Compresh server (see ``tul1_client.call_v1_tul1``). Local pipeline
+        # is still needed for cold storage + fetch_compressed retrieval support.
         self.pipeline = Pipeline(
             log=self.log,
             cold=self.cold,
             enable_q_matrix=False,
-            summarizer=Tier1Summarizer(
-                protect_mode=DEFAULT_TIER1_PROTECT_MODE,
-                q_classifier=QMatrixClassifier(),
-                epi_classifier=EpistemicClassifier(),
-            ),
+            summarizer=Tier1Summarizer(),
         )
         self.retriever = Retriever(log=self.log, cold=self.cold)
 
@@ -237,36 +244,77 @@ async def tool_compress(
                 "session_id": session_id,
             }
 
-    composed = compose_compresh_history(
+    local_composed = compose_compresh_history(
         messages, turn_boxes, upto_idx=len(messages) - 1, mode=protection_mode,
     )
 
-    # Symmetric saving comparison:
-    # Without Compresh, the upstream would see ALL messages verbatim.
+    # ── Server-side TUL 1.0 overlay (paid tier) ────────────────────
+    # compresh-mcp >=0.2.0 always has a valid API key (startup gate).
+    # Call /v1/tul1 for the enhanced compressed view; on any failure
+    # silently fall back to the local result. This is degraded mode —
+    # the user still sees compression, just without TUL 1.0 enhancement.
+    auth = get_auth()
+    tul1_used = False
+    tul1_payment_required = False
+    tul1_error: Optional[str] = None
+    server_compresh_md: Optional[str] = None
+    server_raw_tail: Optional[list] = None
+    server_n_compressed_turns: Optional[int] = None
+    if auth.api_key and auth.tier != "offline":
+        try:
+            tul1_result = await call_v1_tul1(
+                api_key=auth.api_key,
+                session_id=session_id,
+                messages=messages,
+                protection_mode=protection_mode,
+                provider_hint=provider_hint,
+                model_hint=model_hint,
+            )
+            tul1_used = True
+            server_compresh_md = tul1_result.compresh_md
+            server_raw_tail = tul1_result.raw_tail
+            server_n_compressed_turns = tul1_result.n_compressed_turns
+        except Tul1PaymentRequired as e:
+            tul1_payment_required = True
+            tul1_error = f"payment-required: {e}"
+            logger.info(
+                "/v1/tul1 payment required (your_tier=%s, budget_cents=%d) — using local result",
+                e.your_tier, e.budget_cents,
+            )
+        except (Tul1NetworkError, Tul1ServerError) as e:
+            tul1_error = str(e)
+            logger.warning("/v1/tul1 unavailable — using local result: %s", e)
+        except Exception as e:
+            tul1_error = f"unexpected: {type(e).__name__}: {e}"
+            logger.warning("/v1/tul1 unexpected error — using local result: %s", e)
+
+    # Resolved compressed view — server overrides local on success.
+    compresh_md = server_compresh_md if tul1_used else (local_composed.compresh_md or "")
+    raw_tail = server_raw_tail if tul1_used and server_raw_tail else list(local_composed.raw_tail)
+    n_compressed_turns = (
+        server_n_compressed_turns if tul1_used and server_n_compressed_turns is not None
+        else local_composed.n_compressed
+    )
+
+    # ── Saving math (honest reporting) ─────────────────────────────
+    # Without Compresh, upstream would see ALL messages verbatim.
     # With Compresh, it sees system(compresh_md) + raw_tail.
-    # Both sides include the current user, so raw_chars iterates over all
-    # messages (not messages[:-1] which underestimates by excluding the
-    # trailing user from raw but keeping it in raw_tail).
     raw_chars = sum(
         len(m.get("content") or "")
         for m in messages
         if isinstance(m.get("content"), str)
     )
     optimized_chars = (
-        len(composed.compresh_md or "")
+        len(compresh_md or "")
         + sum(
             len(m.get("content") or "")
-            for m in composed.raw_tail
+            for m in (raw_tail or [])
             if isinstance(m.get("content"), str)
         )
     )
-    # Allow negative saving — honest reporting. Short/sparse conversations
-    # incur TurnBox overhead that exceeds the content shaved (~200 char
-    # per turn header). The dashboard should reflect this so users can see
-    # the break-even point in their own usage patterns.
     saving_chars = raw_chars - optimized_chars
     n_compressed_entries = sum(
-        len(b.compressed_refs) for b in turn_boxes[: composed.n_compressed]
+        len(b.compressed_refs) for b in turn_boxes[: local_composed.n_compressed]
     )
 
     state.saved_chars += saving_chars
@@ -274,19 +322,21 @@ async def tool_compress(
     state.n_turns = max(state.n_turns, len(messages))
 
     optimized_messages: list[dict[str, Any]] = []
-    if composed.compresh_md:
+    if compresh_md:
         optimized_messages.append({
             "role": "system",
             "content": (
                 "Below is a compressed memory of older turns "
                 "(the most recent turns follow as raw messages):\n\n"
-                + composed.compresh_md
+                + compresh_md
             ),
         })
-    optimized_messages.extend(composed.raw_tail)
+    optimized_messages.extend(raw_tail or [])
 
     # Fire-and-forget telemetry — local compression has already succeeded.
-    # Approximation: saving_chars / 4 = saved_input_tokens (heuristic).
+    # When tul1_used, /v1/tul1 already wrote a row server-side; we still
+    # call report_usage so /v1/me/usage stays consistent across both
+    # source labels. Future: dedupe at the server side.
     asyncio.create_task(
         _report_usage_background(
             session_id=session_id,
@@ -304,30 +354,29 @@ async def tool_compress(
         "applied": True,
         "compresh": True,
         "tulbase": True,
+        "tul1_server_used": tul1_used,
+        "tul1_payment_required": tul1_payment_required,
+        "tul1_error": tul1_error,
         "optimized_messages": optimized_messages,
-        "compresh_md": composed.compresh_md or "",
-        "raw_tail": list(composed.raw_tail),
-        "n_compressed_turns": composed.n_compressed,
+        "compresh_md": compresh_md or "",
+        "raw_tail": list(raw_tail or []),
+        "n_compressed_turns": n_compressed_turns,
         "n_compressed_entries": n_compressed_entries,
         "n_total": len(messages),
         "saving_chars": saving_chars,
-        # Debug breakdown so we can see exactly which side overweighs.
         "_debug_raw_chars": raw_chars,
         "_debug_optimized_chars": optimized_chars,
-        "_debug_compresh_md_len": len(composed.compresh_md or ""),
+        "_debug_compresh_md_len": len(compresh_md or ""),
         "_debug_raw_tail_chars": sum(
             len(m.get("content") or "")
-            for m in composed.raw_tail
+            for m in (raw_tail or [])
             if isinstance(m.get("content"), str)
         ),
         "session_id": session_id,
         "protection_mode": protection_mode,
         "protection_zone_n": n_zone,
-        "protect_mode_active": DEFAULT_TIER1_PROTECT_MODE,
-        "q_classifier_enabled": True,
-        "epi_classifier_enabled": True,
         "tools_hint": ["fetch_compressed", "list_compressed"],
-        "tier": (get_auth().tier or "unknown"),
+        "tier": (auth.tier or "unknown"),
     }
 
 
@@ -631,7 +680,7 @@ async def serve() -> None:
             read_stream, write_stream,
             InitializationOptions(
                 server_name="compresh-mcp",
-                server_version="0.1.0",
+                server_version="0.2.0",
                 capabilities=app.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},

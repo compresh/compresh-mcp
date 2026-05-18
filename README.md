@@ -6,9 +6,16 @@
 > depth-aware adaptation on top of the open-source [`tulbase`](https://github.com/compresh/tulbase)
 > compression core. This is the **paid tier** distribution.
 
-This package bundles `tulbase` (MIT) as `compresh_mcp.tulbase`. You can also
-install it standalone via `pip install tulbase` if you only need the free
-open-core layer. See [NOTICES.md](./NOTICES.md) for vendoring details.
+## Architecture (0.2.0+)
+
+- **Local**: bundled `tulbase` (MIT, vendored as `compresh_mcp.tulbase`) runs on every turn for fast compression + cold-storage support (`fetch_compressed` / `list_compressed` MCP tools).
+- **Server**: TUL 1.0 layers (Q-protective ranking, epistemic markers, semantic store) run on Compresh infrastructure via the `/v1/tul1` endpoint, gated by your Compresh API key + tier.
+- **Degraded mode**: if `/v1/tul1` is unreachable, compresh-mcp transparently falls back to the local tulbase result so compression never blocks.
+
+Previously (0.1.0, yanked), TUL 1.0 classifiers shipped inside the client
+package. That distribution leaked paid features into the local install
+and is no longer recommended — install 0.2.0 or later. See
+[CHANGELOG.md](./CHANGELOG.md) for the migration note.
 
 ## What's the difference vs `tulbase-mcp`?
 

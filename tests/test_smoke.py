@@ -1,9 +1,10 @@
 """Smoke tests for compresh-mcp.
 
 These tests run without network access and without a real Compresh API
-key — they exercise the local TUL 1.0 classifiers (Q matrix, epistemic)
-and verify the auth/onboarding modules import cleanly. Integration tests
-against the live Compresh API live in a separate suite.
+key — they verify the package imports cleanly, tulbase vendored
+correctly, the /v1/tul1 HTTP client is wired up, and the MCP tool
+schemas are present. Integration tests against the live Compresh API
+live in a separate suite.
 """
 
 from __future__ import annotations
@@ -12,43 +13,57 @@ from __future__ import annotations
 def test_package_importable() -> None:
     import compresh_mcp
 
-    assert compresh_mcp.__version__ == "0.1.0"
+    assert compresh_mcp.__version__ == "0.2.0"
     assert compresh_mcp.__license__ == "BUSL-1.1"
 
 
-def test_tul1_classifiers_importable() -> None:
-    """Q matrix + epistemic + semantic store import cleanly."""
-    from compresh_mcp.tul1 import (
-        EpistemicClassifier,
-        QClassification,
-        QMatrixClassifier,
-        SemanticStore,
+def test_tulbase_vendored_importable() -> None:
+    """tulbase vendored as compresh_mcp.tulbase — core exports present."""
+    from compresh_mcp.tulbase import (
+        ColdStorage,
+        CompressionLog,
+        Pipeline,
+        Retriever,
+        Tier1Summarizer,
+        compose_compresh_history,
     )
 
-    assert QMatrixClassifier is not None
-    assert EpistemicClassifier is not None
-    assert SemanticStore is not None
-    assert QClassification is not None
+    assert ColdStorage is not None
+    assert CompressionLog is not None
+    assert Pipeline is not None
+    assert Retriever is not None
+    assert Tier1Summarizer is not None
+    assert compose_compresh_history is not None
 
 
-def test_q_matrix_classifies_simple_sentence() -> None:
-    from compresh_mcp.tul1 import QMatrixClassifier
+def test_tul1_client_importable() -> None:
+    """tul1_client module — HTTP client for /v1/tul1 server endpoint."""
+    from compresh_mcp.tul1_client import (
+        Tul1NetworkError,
+        Tul1PaymentRequired,
+        Tul1Result,
+        Tul1ServerError,
+        call_v1_tul1,
+    )
 
-    clf = QMatrixClassifier()
-    # Smoke — at minimum, classify_text_pairs should return without error
-    # on a trivial input. Don't assert specific Q assignment because
-    # heuristics may evolve.
-    result = clf.classify_text_pairs("Python is a programming language.")
-    assert result is not None
+    assert callable(call_v1_tul1)
+    assert Tul1Result is not None
+    assert issubclass(Tul1PaymentRequired, Exception)
+    assert issubclass(Tul1NetworkError, Exception)
+    assert issubclass(Tul1ServerError, Exception)
 
 
-def test_epistemic_classifies_simple_sentence() -> None:
-    from compresh_mcp.tul1 import EpistemicClassifier
-
-    clf = EpistemicClassifier()
-    # Same smoke approach
-    result = clf.classify_text_pairs("I think this might be true.")
-    assert result is not None
+def test_tul1_namespace_removed() -> None:
+    """tul1 namespace was archived in 0.2.0 — must NOT be importable."""
+    try:
+        import compresh_mcp.tul1  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        raise AssertionError(
+            "compresh_mcp.tul1 namespace must not be importable in 0.2.0+ — "
+            "TUL 1.0 layers were moved server-side. See archive/0.1.0-tul1/."
+        )
 
 
 def test_auth_module_no_key_raises() -> None:
