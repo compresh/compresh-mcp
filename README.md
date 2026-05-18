@@ -37,17 +37,19 @@ base LexRank at the same token savings — Pareto improvement.
 
 ## Pricing
 
-See [https://compre.sh/pricing](https://compre.sh/pricing). Three tiers:
+| Plan | Period | Saving-share |
+|---|---|---|
+| **Starter** (free + budget loaded) | pay-as-you-go | **30%** |
+| **Pro Quarterly** ($18) | 3 mo | **20%** |
+| **Pro Semi-Annual** ($33) | 6 mo | **16%** |
+| **Pro Annual** ($60) | 1 yr | **12%** |
+| Anonymous / free / local LLM | — | 0% (free, tulbase only) |
 
-- **Tier-A** (integrated MCP/OAuth metadata, e.g. Cowork, Claude Code, Cursor):
-  saving-share **%25** on actual model cost
-- **Tier-B** (family-level provider declaration):
-  saving-share **%25** on the family's cheapest model price
-- **Tier-C** (anonymous / local LLM / free models):
-  flat **$0.20 per 1M saved input tokens**
+Every new user: **$30 free credit** (90-day expiry), **$10 minimum top-up** (charged $7.50 with a permanent 25% discount on top-ups).
 
-Every new user: **$30 free credit** (90-day expiry), **$10 minimum budget**
-(charged $7.5 after standard %25 discount).
+Saving-share is the cut Compresh takes on the **savings** measured against the user's chosen model. The base value comes from the actual model price (when known) or the provider family's cheapest model; anonymous / free-model usage falls back to a flat $0.20 / 1M saved input tokens.
+
+See [compre.sh/pricing](https://compre.sh/pricing) for the canonical pricing page.
 
 ## Installation
 
