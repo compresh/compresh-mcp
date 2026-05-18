@@ -1,0 +1,99 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compresh-mcp"
+version = "0.1.0"
+description = "MCP server for Compresh — production-grade context compression with Q-protective ranking, epistemic markers, and depth-aware adaptation"
+readme = "README.md"
+license = { text = "BUSL-1.1" }
+authors = [
+    { name = "Compresh Ltd", email = "hello@compre.sh" },
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "llm",
+    "agent",
+    "context-compression",
+    "compresh",
+    "q-protective",
+    "epistemic",
+    "tulving",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "mcp >= 1.0.0",
+    "duckdb >= 0.10.0",
+    "httpx >= 0.24.0",
+    "sentence-transformers >= 2.2.0",
+    "scikit-learn >= 1.3.0",
+]
+
+[project.optional-dependencies]
+# tulbase tokenizer (cost counter)
+tokenizer = [
+    "tiktoken >= 0.5.0",
+]
+# tulbase summarizer (LexRank — recommended for production)
+summarizer = [
+    "sumy >= 0.11.0",
+    "nltk >= 3.8.0",
+]
+# tulbase injection detector (heavy ML deps)
+injection = [
+    "torch >= 2.0.0",
+    "transformers >= 4.30.0",
+]
+# tulbase FastAPI proxy mode (not needed for MCP stdio usage)
+proxy = [
+    "fastapi >= 0.100.0",
+    "uvicorn >= 0.23.0",
+]
+verify = [
+    "tiktoken >= 0.7.0",
+    "transformers >= 4.40.0",
+]
+dev = [
+    "pytest >= 8.0",
+    "pytest-asyncio >= 0.23",
+    "ruff >= 0.4",
+    "mypy >= 1.10",
+]
+
+[project.urls]
+Homepage = "https://compre.sh"
+Documentation = "https://compre.sh/docs"
+Issues = "https://github.com/compresh/compresh-mcp/issues"
+
+[project.scripts]
+compresh-mcp = "compresh_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+compresh_mcp = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,34 @@
+Business Source License 1.1
+
+License text Copyright (c) 2026 Compresh Ltd.
+
+Parameters
+
+Licensor:               Compresh Ltd
+Licensed Work:          compresh-mcp (this distribution)
+Additional Use Grant:   You may use the Licensed Work in non-production
+                        environments. Production use requires a valid
+                        Compresh subscription — see https://compre.sh/pricing
+Change Date:            2030-05-16
+Change License:         MIT License
+
+For information about alternative licensing arrangements, contact
+hello@compre.sh.
+
+---
+
+Notice
+
+The Business Source License (this document, or the "License") is not an
+Open Source license. However, the Licensed Work will eventually be made
+available under an Open Source License, as stated in this License.
+
+Full BSL 1.1 text: https://mariadb.com/bsl11/
+
+---
+
+Patent notice
+
+Q-protective ranking + Protection Zone are covered by TR-TPMK patent
+application 2026/007305 (Compresh Ltd, May 2026). A valid Compresh
+subscription includes implementation license for the covered claims.
