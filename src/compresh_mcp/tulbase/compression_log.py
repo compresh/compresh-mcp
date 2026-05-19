@@ -239,12 +239,18 @@ class CompressionLog:
     # Create
     # ------------------------------------------------------------------
     def save(self, entry: CompressionEntry) -> None:
-        """Insert a new compression entry. Raises on duplicate `id`.
+        """Insert a new compression entry. Idempotent on duplicate ``id``.
 
         If ``entry.provenance`` is set, it is folded into
         ``metadata["provenance"]`` so the wider TUL 1.0 metadata
         round-trips through the existing JSON column (no schema change
         needed).
+
+        Duplicate ``id`` (same session_id + turn_idx + content hash) is a
+        no-op rather than an error. This happens when an MCP host resumes
+        the same session_id across process restarts and re-feeds the same
+        history — the resulting compression entries hash identically, so
+        the previous row is the authoritative one.
         """
         # Merge provenance into metadata for persistence.
         meta_for_db = dict(entry.metadata) if entry.metadata else {}
@@ -257,7 +263,8 @@ class CompressionLog:
               (id, session_id, turn_idx, modality, summary, reason, hash,
                size_orig, size_compressed, retrievable, pii_filtered,
                created_at, cold_path, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO NOTHING;
             """,
             [
                 entry.id,

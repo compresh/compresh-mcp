@@ -7,6 +7,24 @@ versions follow [SemVer](https://semver.org/).
 
 ---
 
+## [0.2.2] — 2026-05-19
+
+### Fixed
+
+- **DuckDB primary-key crash on resumed sessions.** When an MCP host
+  resumes the same ``session_id`` after a process restart and re-feeds
+  the same conversation history, the resulting compression entries hash
+  identically and trigger a ``Constraint Error: Duplicate key …
+  violates primary key constraint``. The pipeline now treats this case
+  as idempotent: ``compression_log.save()`` uses
+  ``INSERT … ON CONFLICT (id) DO NOTHING``. Visible symptom in 0.2.1:
+  ``[compresh-mcp] WARNING: pipeline.run failed at turn N: Constraint
+  Error: Duplicate key …`` surfaced in the host TUI, and the calling
+  hook saw an empty ``compresh_md`` response (silent skip on the
+  OpenClaw / Compresh hook).
+
+---
+
 ## [0.2.1] — 2026-05-19
 
 ### Fixed
