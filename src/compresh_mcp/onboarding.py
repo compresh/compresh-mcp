@@ -21,7 +21,7 @@ import textwrap
 import webbrowser
 
 DEFAULT_SIGNUP_URL = os.environ.get(
-    "COMPRESH_SIGNUP_URL", "https://api.compre.sh/signup?source=compresh-mcp"
+    "COMPRESH_SIGNUP_URL", "https://compre.sh/signup?source=compresh-mcp"
 )
 DEFAULT_DOCS_URL = os.environ.get(
     "COMPRESH_DOCS_URL", "https://compre.sh/docs/mcp"

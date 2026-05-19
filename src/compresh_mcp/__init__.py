@@ -28,11 +28,18 @@ Architecture history:
 
     0.2.0 (2026-05-18 ~15:30 UTC) — TUL 1.0 moved server-side behind
         ``/v1/tul1``. Local pipeline keeps tulbase only.
+
+    0.2.1 (2026-05-19 evening) — UX cleanup for MCP host integration:
+        log level WARNING by default (INFO behind ``--verbose`` /
+        ``COMPRESH_VERBOSE=1``), atexit + SIGTERM/SIGINT handlers for
+        clean DuckDB shutdown (prevents ``log.duckdb.wal`` corruption
+        on host restart), onboarding URL fix
+        (``api.compre.sh`` → ``compre.sh``).
 """
 
 from . import tulbase
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "Compresh Ltd"
 __license__ = "BUSL-1.1"
 

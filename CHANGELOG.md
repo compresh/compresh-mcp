@@ -7,6 +7,34 @@ versions follow [SemVer](https://semver.org/).
 
 ---
 
+## [0.2.1] — 2026-05-19
+
+### Fixed
+
+- **Log spam in MCP host TUI.** Default log level is now `WARNING` instead
+  of `INFO` — pipeline turn-by-turn INFO logs (one line per history turn)
+  no longer leak into the host chat surface. Use `--verbose` or
+  `COMPRESH_VERBOSE=1` to re-enable INFO output for debugging.
+
+- **DuckDB `.wal` corruption after host restart.** Added `atexit` +
+  `SIGTERM` / `SIGINT` / `SIGHUP` handlers that cleanly close every
+  per-session DuckDB connection on shutdown. Without this, the host
+  restarting our subprocess could leave a partial WAL behind that
+  failed to replay on the next compress call.
+
+- **Onboarding URL.** Changed the no-API-key signup link from
+  `api.compre.sh/signup?source=compresh-mcp` to
+  `compre.sh/signup?source=compresh-mcp` (login + signup moved to the
+  apex domain).
+
+### Internal
+
+- `_close_all_sessions()` + `_install_lifecycle_handlers()` in
+  `server.py`. Idempotent; safe even if invoked twice on the same
+  signal.
+
+---
+
 ## [0.2.0] — 2026-05-18
 
 ### Changed (breaking)

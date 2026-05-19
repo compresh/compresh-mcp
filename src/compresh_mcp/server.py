@@ -680,7 +680,7 @@ async def serve() -> None:
             read_stream, write_stream,
             InitializationOptions(
                 server_name="compresh-mcp",
-                server_version="0.2.0",
+                server_version="0.2.1",
                 capabilities=app.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},
@@ -689,11 +689,60 @@ async def serve() -> None:
         )
 
 
+def _close_all_sessions() -> None:
+    """Cleanly close all per-session DuckDB connections.
+
+    Without this, a crash or abrupt SIGTERM leaves ``log.duckdb.wal`` files
+    behind. The next process tries to recover the WAL and can fail with a
+    ``duckdb.IOException``, breaking the next compress call. Run on
+    ``atexit`` + ``SIGTERM``/``SIGINT`` so the host (MCP gateway, Claude
+    Desktop, etc.) restarting our subprocess doesn't poison the storage.
+    """
+    for sid, state in list(_sessions.items()):
+        try:
+            # CompressionLog wraps a duckdb.connection — close the underlying
+            # connection if exposed.
+            conn = getattr(state.log, "_conn", None)
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+    _sessions.clear()
+
+
+def _install_lifecycle_handlers() -> None:
+    """Register atexit + SIGTERM/SIGINT handlers for clean shutdown."""
+    import atexit
+    import signal
+
+    atexit.register(_close_all_sessions)
+
+    def _signal_handler(signum: int, _frame: Any) -> None:
+        _close_all_sessions()
+        # Re-raise the default behaviour for this signal so the host sees
+        # the expected exit code.
+        sys.exit(128 + signum)
+
+    for sig_name in ("SIGTERM", "SIGINT", "SIGHUP"):
+        sig = getattr(signal, sig_name, None)
+        if sig is None:
+            continue
+        try:
+            signal.signal(sig, _signal_handler)
+        except (ValueError, OSError):
+            # Not running in the main thread, or platform doesn't allow.
+            pass
+
+
 def main() -> None:
+    verbose = "--verbose" in sys.argv or os.environ.get(
+        "COMPRESH_VERBOSE", ""
+    ).lower() in ("true", "1", "yes")
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.INFO if verbose else logging.WARNING,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
+    _install_lifecycle_handlers()
     _bootstrap_auth()
     asyncio.run(serve())
 
