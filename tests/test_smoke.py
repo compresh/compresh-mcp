@@ -11,9 +11,15 @@ from __future__ import annotations
 
 
 def test_package_importable() -> None:
+    import re
+
     import compresh_mcp
 
-    assert compresh_mcp.__version__ == "0.2.0"
+    # Assert a valid semver, not a hardcoded version: the old "0.2.0" check
+    # went stale and failed on every release bump (2026-05-21 fix).
+    assert re.fullmatch(r"\d+\.\d+\.\d+", compresh_mcp.__version__), (
+        f"unexpected version: {compresh_mcp.__version__!r}"
+    )
     assert compresh_mcp.__license__ == "BUSL-1.1"
 
 

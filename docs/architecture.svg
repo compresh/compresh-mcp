@@ -1,0 +1,106 @@
+<svg viewBox="0 0 960 800" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,Roboto,sans-serif" role="img">
+<title>compresh-mcp akış diyagramı</title>
+<desc>compresh-mcp: tulbase 1-5 kullanıcı tarafında çalışır; tier kontrolü LexRank'tan önce. Free → 6a LexRank local. Paid → LexRank'sız sunucuya /v1/tul1 (LexRank 9'da). Tagsız sonuç kullanıcıya, modele kullanıcı makinesinden.</desc>
+
+<!-- palette: terracotta #C8553D client/tulbase · teal #1C7C8C sunucu/tul1.0 · red #9B2226 degraded · navy #2A3342 -->
+<defs>
+  <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2A3342"/></marker>
+  <marker id="arrT" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1C7C8C"/></marker>
+  <marker id="arrR" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9B2226"/></marker>
+</defs>
+
+<rect width="960" height="800" fill="#ffffff"/>
+<text x="34" y="34" font-size="20" font-weight="700" fill="#2A3342">compresh-mcp — akış</text>
+<text x="34" y="54" font-size="12.5" fill="#6B7280">tier kontrolü LexRank'tan önce · LexRank tek yerde: free 6a (client) / paid 9 (sunucu)</text>
+
+<!-- legend -->
+<g font-size="11" fill="#374151">
+  <rect x="640" y="22" width="14" height="14" rx="3" fill="#C8553D"/><text x="660" y="33">client / tulbase</text>
+  <rect x="760" y="22" width="14" height="14" rx="3" fill="#1C7C8C"/><text x="780" y="33">sunucu / tul1.0</text>
+  <line x1="642" y1="50" x2="656" y2="50" stroke="#9B2226" stroke-width="2.5" stroke-dasharray="4 3"/><text x="660" y="54">degraded</text>
+</g>
+
+<!-- ===== CLIENT ZONE ===== -->
+<rect x="24" y="70" width="540" height="712" rx="12" fill="#FBEEE9" stroke="#C8553D" stroke-width="1.6"/>
+<text x="44" y="92" font-size="13" font-weight="700" fill="#C8553D">KULLANICI MAKİNESİ</text>
+
+<!-- MCP host -->
+<rect x="60" y="102" width="468" height="44" rx="8" fill="#fff" stroke="#C8553D" stroke-width="1.4"/>
+<text x="294" y="123" font-size="13" font-weight="600" fill="#2A3342" text-anchor="middle">MCP host — Cowork / Claude Code / Cursor</text>
+<text x="294" y="138" font-size="10.5" fill="#6B7280" text-anchor="middle">compress(history)</text>
+<line x1="294" y1="146" x2="294" y2="166" stroke="#2A3342" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- tulbase client steps 1-5 (NO LexRank) -->
+<rect x="60" y="168" width="468" height="80" rx="8" fill="#fff" stroke="#C8553D" stroke-width="1.4"/>
+<text x="294" y="188" font-size="13" font-weight="700" fill="#C8553D" text-anchor="middle">tulbase 1–5 (açık çekirdek · MIT · LOCAL)</text>
+<text x="294" y="208" font-size="11" fill="#374151" text-anchor="middle">1 Cleanup → 2 Injection → 3 TurnBox → 4 Protection Zone</text>
+<text x="294" y="226" font-size="11" fill="#374151" text-anchor="middle">5 Modality elision → cold store + ANCHOR</text>
+<text x="294" y="242" font-size="10" fill="#6B7280" text-anchor="middle">(LexRank henüz YOK — tier kararından sonra)</text>
+<line x1="294" y1="248" x2="294" y2="272" stroke="#2A3342" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- decision BEFORE LexRank -->
+<polygon points="294,274 398,318 294,362 190,318" fill="#fff" stroke="#2A3342" stroke-width="1.6"/>
+<text x="294" y="313" font-size="12" font-weight="700" fill="#2A3342" text-anchor="middle">Ücretli üyelik</text>
+<text x="294" y="329" font-size="12" font-weight="700" fill="#2A3342" text-anchor="middle">+ kredi?</text>
+
+<!-- FREE branch → 6a LexRank local -->
+<path d="M190,318 L120,318 L120,398" fill="none" stroke="#2A3342" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="112" y="360" font-size="11" font-weight="700" fill="#9B2226" text-anchor="end">Hayır</text>
+<text x="112" y="374" font-size="9.5" fill="#6B7280" text-anchor="end">anon / kredi yok</text>
+<rect x="60" y="400" width="200" height="56" rx="8" fill="#FBEEE9" stroke="#C8553D" stroke-width="1.4"/>
+<text x="160" y="422" font-size="12" font-weight="700" fill="#C8553D" text-anchor="middle">6a LexRank · TAGSIZ</text>
+<text x="160" y="438" font-size="10" fill="#6B7280" text-anchor="middle">local · Q yok · dedup yok</text>
+<text x="160" y="451" font-size="9.5" fill="#374151" text-anchor="middle">tulbase akışı LexRank ile biter</text>
+<path d="M160,456 L160,512" fill="none" stroke="#2A3342" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- PAID branch → server (skip LexRank) -->
+<text x="408" y="312" font-size="11" font-weight="700" fill="#1C7C8C">Evet</text>
+<text x="408" y="326" font-size="9.5" fill="#1C7C8C">LexRank'sız →</text>
+
+<!-- merge: tagless context -->
+<rect x="60" y="514" width="468" height="52" rx="8" fill="#fff" stroke="#C8553D" stroke-width="1.6"/>
+<text x="294" y="536" font-size="13" font-weight="700" fill="#2A3342" text-anchor="middle">Tagsız sıkıştırılmış bağlam</text>
+<text x="294" y="554" font-size="10.5" fill="#6B7280" text-anchor="middle">free → 6a sonucu · paid → /v1/tul1 sonucu</text>
+<line x1="294" y1="566" x2="294" y2="588" stroke="#2A3342" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- model provider -->
+<rect x="60" y="590" width="468" height="58" rx="8" fill="#EEF1F4" stroke="#2A3342" stroke-width="1.4"/>
+<text x="294" y="612" font-size="13" font-weight="700" fill="#2A3342" text-anchor="middle">Model provider — OpenAI / Anthropic / …</text>
+<text x="294" y="629" font-size="10.5" fill="#374151" text-anchor="middle">kullanıcının KENDİ key'i · kullanıcı makinesinden</text>
+<text x="294" y="642" font-size="10" font-weight="600" fill="#9B2226" text-anchor="middle">Compresh provider key'i GÖRMEZ</text>
+
+<!-- ADD note -->
+<rect x="60" y="664" width="468" height="104" rx="8" fill="#fff" stroke="#C8553D" stroke-width="1.2" stroke-dasharray="5 3"/>
+<text x="76" y="684" font-size="12" font-weight="700" fill="#C8553D">EKLENECEK (bu hizalama)</text>
+<text x="76" y="704" font-size="11" fill="#374151">1 · Tier kontrolü LexRank'tan ÖNCE: Hayır → 6a (client),</text>
+<text x="76" y="720" font-size="11" fill="#374151">     Evet → LexRank'a girme, /v1/tul1'e gönder (LexRank 9'da)</text>
+<text x="76" y="740" font-size="11" fill="#374151">2 · Modele gitmeden tag temizliği — sunucu zaten tagsız;</text>
+<text x="76" y="756" font-size="11" fill="#374151">     client tulbase render'ı da tagsız (Q-kalıntısı kaldır)</text>
+
+<!-- ===== SERVER ZONE ===== -->
+<rect x="592" y="272" width="344" height="244" rx="12" fill="#E3F2F5" stroke="#1C7C8C" stroke-width="1.6"/>
+<text x="612" y="294" font-size="13" font-weight="700" fill="#1C7C8C">COMPRESH SUNUCU (api.compre.sh)</text>
+
+<rect x="612" y="306" width="304" height="170" rx="8" fill="#fff" stroke="#1C7C8C" stroke-width="1.4"/>
+<text x="764" y="327" font-size="13" font-weight="700" fill="#1C7C8C" text-anchor="middle">POST /v1/tul1  (TUL 1.0 — paid)</text>
+<text x="764" y="343" font-size="10" fill="#6B7280" text-anchor="middle">API key + tier gate · LexRank'sız girdi alır</text>
+<text x="764" y="367" font-size="11" fill="#374151" text-anchor="middle">6 Q-matrix (Q1–Q4)</text>
+<text x="764" y="385" font-size="11" fill="#374151" text-anchor="middle">7 Semantic dedup → anchor</text>
+<text x="764" y="403" font-size="11" fill="#374151" text-anchor="middle">8 Epistemic markers</text>
+<rect x="650" y="414" width="228" height="32" rx="6" fill="#E3F2F5" stroke="#1C7C8C" stroke-width="1.2"/>
+<text x="764" y="430" font-size="11" font-weight="700" fill="#1C7C8C" text-anchor="middle">9 LexRank (Q-bilinçli) · TAGSIZ</text>
+<text x="764" y="441" font-size="9" fill="#6B7280" text-anchor="middle">(dedup sonrası)</text>
+<text x="764" y="464" font-size="10.5" font-weight="600" fill="#1C7C8C" text-anchor="middle">→ sonuç KULLANICIYA (modele değil)</text>
+
+<!-- paid: diamond -> server -->
+<path d="M398,318 L520,318 Q566,318 566,348 L566,360 L608,360" fill="none" stroke="#1C7C8C" stroke-width="1.6" marker-end="url(#arrT)"/>
+
+<!-- server -> merge (tagless back to user) -->
+<path d="M612,452 L548,452 Q470,452 470,514" fill="none" stroke="#1C7C8C" stroke-width="1.6" marker-end="url(#arrT)"/>
+<text x="548" y="468" font-size="10" fill="#1C7C8C" text-anchor="middle">tagsız sonuç</text>
+
+<!-- degraded fallback -->
+<path d="M608,330 L470,330 L470,406 L256,428" fill="none" stroke="#9B2226" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arrR)"/>
+<text x="500" y="322" font-size="9" fill="#9B2226" text-anchor="middle">erişilemez → local tulbase</text>
+
+</svg>

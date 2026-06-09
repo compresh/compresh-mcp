@@ -127,10 +127,14 @@ class SessionState:
         self.log.ensure_schema()
         self.cold = ColdStorage(str(self.workdir / "cold"))
 
-        # Local pipeline runs the open-source tulbase core only — no Q-protective
-        # ranking, no epistemic markers, no semantic store. Those layers run on
-        # the Compresh server (see ``tul1_client.call_v1_tul1``). Local pipeline
-        # is still needed for cold storage + fetch_compressed retrieval support.
+        # Local pipeline runs the open-source tulbase core only — no Q matrix
+        # classifier, no Q-protective ranking, no epistemic markers, no semantic
+        # store. Those are the PAID layer and run server-side (see
+        # ``tul1_client.call_v1_tul1`` → /v1/tul1). [21 May 2026: a client-side
+        # classifier was explored (Decision B) then REVERSED — no bench basis;
+        # the classifier is deterministic + cheap and the server already
+        # receives the full messages, so client-side classification offered no
+        # measurable gain.] Local pipeline still backs cold storage + fetch.
         self.pipeline = Pipeline(
             log=self.log,
             cold=self.cold,
@@ -221,46 +225,54 @@ async def tool_compress(
             "tier": (get_auth().tier or "unknown"),
         }
 
-    turn_boxes = []
-    for i, m in enumerate(messages):
-        content = m.get("content", "")
-        if not isinstance(content, str):
-            content = json.dumps(content)
-        try:
-            pr = state.pipeline.run(
-                content,
-                session_id=session_id,
-                turn_idx=i,
-                speaker=_normalize_speaker(m.get("role", "user")),
-            )
-            turn_boxes.append(pr.turn_box)
-        except Exception as e:
-            logger.warning("pipeline.run failed at turn %d: %s", i, e)
-            return {
-                "ok": False,
-                "error": f"pipeline error at turn {i}: {type(e).__name__}",
-                "optimized_messages": messages,
-                "n_total": len(messages),
-                "session_id": session_id,
-            }
-
-    local_composed = compose_compresh_history(
-        messages, turn_boxes, upto_idx=len(messages) - 1, mode=protection_mode,
-    )
-
-    # ── Server-side TUL 1.0 overlay (paid tier) ────────────────────
-    # compresh-mcp >=0.2.0 always has a valid API key (startup gate).
-    # Call /v1/tul1 for the enhanced compressed view; on any failure
-    # silently fall back to the local result. This is degraded mode —
-    # the user still sees compression, just without TUL 1.0 enhancement.
     auth = get_auth()
+    # Diagram (docs/architecture.svg): tier check is BEFORE LexRank.
+    will_try_server = bool(auth.api_key) and auth.tier != "offline"
+
+    def _run_turns(summarize: bool) -> tuple[list, Optional[dict[str, Any]]]:
+        boxes: list = []
+        for i, m in enumerate(messages):
+            content = m.get("content", "")
+            if not isinstance(content, str):
+                content = json.dumps(content)
+            try:
+                pr = state.pipeline.run(
+                    content,
+                    session_id=session_id,
+                    turn_idx=i,
+                    speaker=_normalize_speaker(m.get("role", "user")),
+                    summarize=summarize,
+                )
+                boxes.append(pr.turn_box)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("pipeline.run failed at turn %d: %s", i, e)
+                return boxes, {
+                    "ok": False,
+                    "error": f"pipeline error at turn {i}: {type(e).__name__}",
+                    "optimized_messages": messages,
+                    "n_total": len(messages),
+                    "session_id": session_id,
+                }
+        return boxes, None
+
+    # Steps 1–5 (cold storage + anchors) ALWAYS run for fetch_compressed.
+    # The paid path DEFERS local LexRank (summarize=False): /v1/tul1 produces
+    # the summary server-side (LexRank @9), so computing it locally too is
+    # waste. Free / offline path summarizes locally now (LexRank @6a).
+    turn_boxes, err = _run_turns(summarize=not will_try_server)
+    if err is not None:
+        return err
+
+    # ── Server-side TUL 1.0 (paid tier) ── diagram: paid → /v1/tul1 (LexRank @9)
+    # compresh-mcp >=0.2.0 always has a valid API key (startup gate). On any
+    # failure we fall back to the local result (degraded mode) — see re-run below.
     tul1_used = False
     tul1_payment_required = False
     tul1_error: Optional[str] = None
     server_compresh_md: Optional[str] = None
     server_raw_tail: Optional[list] = None
     server_n_compressed_turns: Optional[int] = None
-    if auth.api_key and auth.tier != "offline":
+    if will_try_server:
         try:
             tul1_result = await call_v1_tul1(
                 api_key=auth.api_key,
@@ -287,6 +299,19 @@ async def tool_compress(
         except Exception as e:
             tul1_error = f"unexpected: {type(e).__name__}: {e}"
             logger.warning("/v1/tul1 unexpected error — using local result: %s", e)
+
+    # Degraded fallback: we deferred local LexRank for the paid path but the
+    # server did not run — re-run the turns WITH summarize=True so the local
+    # result carries summaries. compression_log.save is idempotent (deterministic
+    # entry ids + ON CONFLICT DO NOTHING), so the re-run adds no duplicate rows.
+    if will_try_server and not tul1_used:
+        turn_boxes, err = _run_turns(summarize=True)
+        if err is not None:
+            return err
+
+    local_composed = compose_compresh_history(
+        messages, turn_boxes, upto_idx=len(messages) - 1, mode=protection_mode,
+    )
 
     # Resolved compressed view — server overrides local on success.
     compresh_md = server_compresh_md if tul1_used else (local_composed.compresh_md or "")
@@ -317,6 +342,43 @@ async def tool_compress(
         len(b.compressed_refs) for b in turn_boxes[: local_composed.n_compressed]
     )
 
+    # Net-negative saving guard: on short conversations the Compresh memory
+    # header can outweigh the text it elides, so the "compressed" view is
+    # actually larger than the raw turns. Reporting that as a negative
+    # saving is wrong (it drags down dashboard totals and bills nothing).
+    # Treat it as a pass-through: applied=False, saving=0, raw messages
+    # returned unchanged. The calling hook then skips injection.
+    if saving_chars <= 0:
+        state.n_turns = max(state.n_turns, len(messages))
+        asyncio.create_task(
+            _report_usage_background(
+                session_id=session_id,
+                saved_input_tokens=0,
+                saved_chars=0,
+                original_chars=raw_chars,
+                tulbase_chars=optimized_chars,
+                n_turns=state.n_turns,
+                n_compressed_entries=0,
+                provider_hint=provider_hint,
+                model_hint=model_hint,
+            )
+        )
+        return {
+            "ok": True,
+            "applied": False,
+            "reason": "net_negative_saving",
+            "optimized_messages": messages,
+            "compresh_md": "",
+            "raw_tail": messages,
+            "n_compressed_turns": 0,
+            "n_compressed_entries": 0,
+            "n_total": len(messages),
+            "saving_chars": 0,
+            "session_id": session_id,
+            "protection_mode": protection_mode,
+            "tier": (get_auth().tier or "unknown"),
+        }
+
     state.saved_chars += saving_chars
     state.n_compressed_entries += n_compressed_entries
     state.n_turns = max(state.n_turns, len(messages))
@@ -342,6 +404,8 @@ async def tool_compress(
             session_id=session_id,
             saved_input_tokens=saving_chars // 4,
             saved_chars=saving_chars,
+            original_chars=raw_chars,
+            tulbase_chars=optimized_chars,
             n_turns=state.n_turns,
             n_compressed_entries=state.n_compressed_entries,
             provider_hint=provider_hint,
@@ -450,9 +514,12 @@ async def tool_stats(session_id: str) -> dict[str, Any]:
         "n_compressed_entries": state.n_compressed_entries,
         "saved_chars": state.saved_chars,
         "storage_path": str(state.workdir),
-        "protect_mode_active": DEFAULT_TIER1_PROTECT_MODE,
-        "q_classifier_enabled": True,
-        "epi_classifier_enabled": True,
+        # Local pipeline = open-source tulbase core only (no Q-protective).
+        # Q-protective ranking + epistemic markers run server-side (/v1/tul1).
+        # Report the LOCAL pipeline's real state, not a hardcoded flag.
+        "protect_mode_active": getattr(state.pipeline.summarizer, "protect_mode", "off"),
+        "q_classifier_enabled": state.pipeline.q_classifier is not None,
+        "epi_classifier_enabled": getattr(state.pipeline.summarizer, "epi_classifier", None) is not None,
     }
 
 
@@ -680,7 +747,7 @@ async def serve() -> None:
             read_stream, write_stream,
             InitializationOptions(
                 server_name="compresh-mcp",
-                server_version="0.2.2",
+                server_version="0.2.4",
                 capabilities=app.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},

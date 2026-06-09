@@ -7,6 +7,48 @@ versions follow [SemVer](https://semver.org/).
 
 ---
 
+## [0.2.5] — 2026-06-09
+
+### Changed
+
+- **Tier check moved before local LexRank (architecture alignment).** The
+  open-source tulbase core still runs steps 1–5 (cold storage + anchors) on
+  every turn, but the paid path now **defers LexRank summarization**: when
+  `/v1/tul1` will run, the summary is produced server-side (LexRank @9), so
+  computing it locally too was pure waste. Free / offline usage summarizes
+  locally as before (LexRank @6a). On server failure the turns are re-run with
+  summarization for the local fallback (idempotent — deterministic entry ids +
+  `ON CONFLICT DO NOTHING`, no duplicate rows). Needs `tulbase` with the new
+  `Pipeline.run(summarize=...)` flag.
+- **Tagless output enforced in the open core.** `tulbase` no longer renders a
+  `Q:` distribution line into the model-facing block (a TUL 1.0 / paid remnant;
+  the value is in the steered summary, not the tag). Both the local tulbase
+  result and the `/v1/tul1` server result are tagless.
+
+## [0.2.4] — 2026-05-21
+
+### Added
+
+- Absolute-size usage reporting (`original_chars` / `tulbase_chars`) in the
+  `/v1/usage/report` payload, so the server can compute total savings and the
+  free-user portal can display the tulbase saving.
+
+## [0.2.3] — 2026-05-20
+
+### Fixed
+
+- **Net-negative "saving" on short conversations.** When the Compresh
+  memory header outweighed the text it elided (typical on conversations
+  just past the protection-zone threshold), `tool_compress` reported a
+  negative `saving_chars`/`saved_input_tokens`, which dragged down
+  dashboard totals (e.g. a session showing −5,016 tokens "saved"). Now
+  guarded: if `saving_chars <= 0`, the call returns `applied=False`,
+  `reason="net_negative_saving"`, the raw messages untouched, and reports
+  `saved=0` telemetry. The calling hook skips context injection in this
+  case, so the model just sees the normal conversation.
+
+---
+
 ## [0.2.2] — 2026-05-19
 
 ### Fixed

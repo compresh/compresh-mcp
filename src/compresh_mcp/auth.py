@@ -136,6 +136,8 @@ def report_usage(
     session_id: str,
     saved_input_tokens: int,
     saved_chars: int,
+    original_chars: int = 0,
+    tulbase_chars: int = 0,
     n_turns: int,
     n_compressed_entries: int,
     provider_hint: Optional[str] = None,
@@ -158,6 +160,12 @@ def report_usage(
         "session_id": session_id,
         "saved_input_tokens": saved_input_tokens,
         "saved_chars": saved_chars,
+        # Absolute sizes (#9a): server only sees the compressed context, so it
+        # needs the client-reported original size to compute total savings; it
+        # can measure tulbase size itself but we send it for cross-check + the
+        # free-user portal saving display (#14).
+        "original_chars": original_chars,
+        "tulbase_chars": tulbase_chars,
         "n_turns": n_turns,
         "n_compressed_entries": n_compressed_entries,
         "provider_hint": provider_hint,

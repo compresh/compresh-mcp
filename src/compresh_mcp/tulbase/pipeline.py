@@ -174,6 +174,7 @@ class Pipeline:
         prev_carry_out: Optional[Sequence[str]] = None,
         carry_in: Optional[Sequence[str]] = None,
         provenance: Optional[Provenance] = None,
+        summarize: bool = True,
     ) -> PipelineResult:
         """Compress one turn end-to-end.
 
@@ -274,23 +275,34 @@ class Pipeline:
                     turn_idx, session_id, q3_new, q3_dup,
                 )
 
-        # 4) Summarize.
-        summary: SummarizerResult = self.summarizer.run(
-            dialog_text,
-            prev_opens=prev_opens,
-            prev_carry_out=prev_carry_out,
-        )
+        # 4) Summarize (LexRank). Skippable: ``summarize=False`` runs steps
+        # 1–3+5 only (cold storage + anchors + structure) and DEFERS LexRank.
+        # The compresh-mcp paid path uses this — when /v1/tul1 will run the
+        # summary server-side (LexRank @9), computing it locally too is waste.
+        # On server failure the caller re-runs with summarize=True for the
+        # local fallback. Free / tulbase-only callers keep the default (True).
+        if summarize:
+            summary: SummarizerResult = self.summarizer.run(
+                dialog_text,
+                prev_opens=prev_opens,
+                prev_carry_out=prev_carry_out,
+            )
+            _summary, _carry_out, _opens, _resolves = (
+                summary.summary, summary.carry_out, summary.opens, summary.resolves,
+            )
+        else:
+            _summary, _carry_out, _opens, _resolves = "", [], [], []
 
         # 5) Build turn box.
         box = TurnBox(
             turn=turn_idx,
             speaker=speaker,  # type: ignore[arg-type]
             session_id=session_id,
-            summary=summary.summary,
+            summary=_summary,
             carry_in=list(carry_in or []),
-            carry_out=summary.carry_out,
-            opens=summary.opens,
-            resolves=summary.resolves,
+            carry_out=_carry_out,
+            opens=_opens,
+            resolves=_resolves,
             compressed_refs=refs,
             provenance=provenance,
             q_distribution=q_distribution,

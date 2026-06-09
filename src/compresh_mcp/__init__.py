@@ -39,7 +39,7 @@ Architecture history:
 
 from . import tulbase
 
-__version__ = "0.2.2"
+__version__ = "0.2.5"
 __author__ = "Compresh Ltd"
 __license__ = "BUSL-1.1"
 

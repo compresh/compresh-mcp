@@ -237,22 +237,12 @@ def render_markdown(box: TurnBox) -> str:
     if box.carry_out:
         lines.append(f"Carry-out: {', '.join(box.carry_out)}")
 
-    # TUL 1.0 Q distribution — compact code line. Order: E M F O.
-    # Q3 dedup hits (when a semantic_store is wired in) surface as a
-    # trailing parenthetical so the model can see "of these N facts, K
-    # were already known from earlier in the conversation".
-    if box.q_distribution:
-        code_map = {"Q1": "E", "Q2": "M", "Q3": "F", "Q4": "O"}
-        parts = []
-        for q in ("Q1", "Q2", "Q3", "Q4"):
-            n = box.q_distribution.get(q, 0)
-            if n > 0:
-                parts.append(f"{code_map[q]}={n}")
-        if parts:
-            suffix = ""
-            if box.q3_dedup_hits > 0:
-                suffix = f" ({box.q3_dedup_hits} dup)"
-            lines.append(f"Q: {' '.join(parts)}{suffix}")
+    # NOTE: tulbase output is always TAGLESS. The Q distribution (Q1–Q4) is a
+    # TUL 1.0 / paid concept that runs server-side; the open core never renders
+    # a `Q:` line into the model-facing block. `q_distribution` is kept on the
+    # dataclass only for JSON round-trip compatibility with the paid pipeline —
+    # it is never emitted here. (Bench finding: sending the tag to the model was
+    # pure token waste; the value is in the steered summary, not the tag.)
 
     return "\n".join(lines)
 
