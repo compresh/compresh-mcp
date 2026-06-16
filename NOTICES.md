@@ -22,7 +22,7 @@ exists to keep `compresh-mcp` self-contained on PyPI without forcing a
 separate dependency.
 
 If you only need the MIT open-core compression layer (turn-box, protection zone,
-compose, retrieval) without the Compresh paid-tier TUL 1.0 classifiers, prefer
+compose, retrieval) without the Compresh paid-tier TUL 2.0 layer, prefer
 installing the standalone package once it ships:
 
 ```bash

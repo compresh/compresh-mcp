@@ -26,7 +26,7 @@ tag attribute alır. Örnek:
 
 Patent referansları:
 - compresh-ltd/legal/patents/provisional-uk/claims-draft-v3.md (Talep 3)
-- wiki-comp/decisions/2026-05-12-epistemic-markers.md (bu dosya)
+- comp-wiki/decisions/2026-05-12-epistemic-markers.md (bu dosya)
 """
 
 from __future__ import annotations

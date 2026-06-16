@@ -6,14 +6,15 @@ Differences from open-source tulbase-mcp:
       production API
     - Per turn, runs the open-source tulbase compression locally for
       cold-storage + fetch_compressed support, AND calls the paid
-      ``/v1/tul1`` server endpoint for TUL 1.0 enhancement (Q-protective
-      ranking + epistemic markers). On network/server failure, falls
+      ``/v1/tul2`` server endpoint for TUL 2.0 enhancement (query-aware
+      retrieval over full history). On network/server failure, falls
       back to the local result silently.
     - Per-session saving telemetry is reported back asynchronously
       (best-effort; local compression never blocks on telemetry)
     - Session state persists in ``~/.compresh/storage/<session_id>/``
 
-Architecture change vs 0.1.0: TUL 1.0 layers moved server-side.
+Architecture: the paid layer runs server-side. (TUL 1.0 Q-matrix was
+retired 15 Jun 2026; the paid path is now TUL 2.0 query-aware retrieval.)
 See ``archive/0.1.0-tul1/README.md`` and CHANGELOG for context.
 """
 
@@ -55,11 +56,11 @@ from .auth import (
     verify_api_key,
 )
 from .onboarding import show_welcome_and_open_signup
-from .tul1_client import (
-    Tul1NetworkError,
-    Tul1PaymentRequired,
-    Tul1ServerError,
-    call_v1_tul1,
+from .tul2_client import (
+    Tul2NetworkError,
+    Tul2PaymentRequired,
+    Tul2ServerError,
+    call_v1_tul2,
 )
 
 logger = logging.getLogger("compresh-mcp")
@@ -127,10 +128,9 @@ class SessionState:
         self.log.ensure_schema()
         self.cold = ColdStorage(str(self.workdir / "cold"))
 
-        # Local pipeline runs the open-source tulbase core only — no Q matrix
-        # classifier, no Q-protective ranking, no epistemic markers, no semantic
-        # store. Those are the PAID layer and run server-side (see
-        # ``tul1_client.call_v1_tul1`` → /v1/tul1). [21 May 2026: a client-side
+        # Local pipeline runs the open-source tulbase core only. The PAID
+        # layer (TUL 2.0 query-aware retrieval) runs server-side (see
+        # ``tul2_client.call_v1_tul2`` → /v1/tul2). [21 May 2026: a client-side
         # classifier was explored (Decision B) then REVERSED — no bench basis;
         # the classifier is deterministic + cheap and the server already
         # receives the full messages, so client-side classification offered no
@@ -256,25 +256,25 @@ async def tool_compress(
         return boxes, None
 
     # Steps 1–5 (cold storage + anchors) ALWAYS run for fetch_compressed.
-    # The paid path DEFERS local LexRank (summarize=False): /v1/tul1 produces
+    # The paid path DEFERS local LexRank (summarize=False): /v1/tul2 produces
     # the summary server-side (LexRank @9), so computing it locally too is
     # waste. Free / offline path summarizes locally now (LexRank @6a).
     turn_boxes, err = _run_turns(summarize=not will_try_server)
     if err is not None:
         return err
 
-    # ── Server-side TUL 1.0 (paid tier) ── diagram: paid → /v1/tul1 (LexRank @9)
+    # ── Server-side TUL 2.0 (paid tier) ── diagram: paid → /v1/tul2 (retrieval)
     # compresh-mcp >=0.2.0 always has a valid API key (startup gate). On any
     # failure we fall back to the local result (degraded mode) — see re-run below.
-    tul1_used = False
-    tul1_payment_required = False
-    tul1_error: Optional[str] = None
+    tul2_used = False
+    tul2_payment_required = False
+    tul2_error: Optional[str] = None
     server_compresh_md: Optional[str] = None
     server_raw_tail: Optional[list] = None
     server_n_compressed_turns: Optional[int] = None
     if will_try_server:
         try:
-            tul1_result = await call_v1_tul1(
+            tul2_result = await call_v1_tul2(
                 api_key=auth.api_key,
                 session_id=session_id,
                 messages=messages,
@@ -282,29 +282,29 @@ async def tool_compress(
                 provider_hint=provider_hint,
                 model_hint=model_hint,
             )
-            tul1_used = True
-            server_compresh_md = tul1_result.compresh_md
-            server_raw_tail = tul1_result.raw_tail
-            server_n_compressed_turns = tul1_result.n_compressed_turns
-        except Tul1PaymentRequired as e:
-            tul1_payment_required = True
-            tul1_error = f"payment-required: {e}"
+            tul2_used = True
+            server_compresh_md = tul2_result.compresh_md
+            server_raw_tail = tul2_result.raw_tail
+            server_n_compressed_turns = tul2_result.n_compressed_turns
+        except Tul2PaymentRequired as e:
+            tul2_payment_required = True
+            tul2_error = f"payment-required: {e}"
             logger.info(
-                "/v1/tul1 payment required (your_tier=%s, budget_cents=%d) — using local result",
+                "/v1/tul2 payment required (your_tier=%s, budget_cents=%d) — using local result",
                 e.your_tier, e.budget_cents,
             )
-        except (Tul1NetworkError, Tul1ServerError) as e:
-            tul1_error = str(e)
-            logger.warning("/v1/tul1 unavailable — using local result: %s", e)
+        except (Tul2NetworkError, Tul2ServerError) as e:
+            tul2_error = str(e)
+            logger.warning("/v1/tul2 unavailable — using local result: %s", e)
         except Exception as e:
-            tul1_error = f"unexpected: {type(e).__name__}: {e}"
-            logger.warning("/v1/tul1 unexpected error — using local result: %s", e)
+            tul2_error = f"unexpected: {type(e).__name__}: {e}"
+            logger.warning("/v1/tul2 unexpected error — using local result: %s", e)
 
     # Degraded fallback: we deferred local LexRank for the paid path but the
     # server did not run — re-run the turns WITH summarize=True so the local
     # result carries summaries. compression_log.save is idempotent (deterministic
     # entry ids + ON CONFLICT DO NOTHING), so the re-run adds no duplicate rows.
-    if will_try_server and not tul1_used:
+    if will_try_server and not tul2_used:
         turn_boxes, err = _run_turns(summarize=True)
         if err is not None:
             return err
@@ -314,10 +314,10 @@ async def tool_compress(
     )
 
     # Resolved compressed view — server overrides local on success.
-    compresh_md = server_compresh_md if tul1_used else (local_composed.compresh_md or "")
-    raw_tail = server_raw_tail if tul1_used and server_raw_tail else list(local_composed.raw_tail)
+    compresh_md = server_compresh_md if tul2_used else (local_composed.compresh_md or "")
+    raw_tail = server_raw_tail if tul2_used and server_raw_tail else list(local_composed.raw_tail)
     n_compressed_turns = (
-        server_n_compressed_turns if tul1_used and server_n_compressed_turns is not None
+        server_n_compressed_turns if tul2_used and server_n_compressed_turns is not None
         else local_composed.n_compressed
     )
 
@@ -396,7 +396,7 @@ async def tool_compress(
     optimized_messages.extend(raw_tail or [])
 
     # Fire-and-forget telemetry — local compression has already succeeded.
-    # When tul1_used, /v1/tul1 already wrote a row server-side; we still
+    # When tul2_used, /v1/tul2 already wrote a row server-side; we still
     # call report_usage so /v1/me/usage stays consistent across both
     # source labels. Future: dedupe at the server side.
     asyncio.create_task(
@@ -418,9 +418,9 @@ async def tool_compress(
         "applied": True,
         "compresh": True,
         "tulbase": True,
-        "tul1_server_used": tul1_used,
-        "tul1_payment_required": tul1_payment_required,
-        "tul1_error": tul1_error,
+        "tul2_server_used": tul2_used,
+        "tul2_payment_required": tul2_payment_required,
+        "tul2_error": tul2_error,
         "optimized_messages": optimized_messages,
         "compresh_md": compresh_md or "",
         "raw_tail": list(raw_tail or []),
@@ -514,8 +514,8 @@ async def tool_stats(session_id: str) -> dict[str, Any]:
         "n_compressed_entries": state.n_compressed_entries,
         "saved_chars": state.saved_chars,
         "storage_path": str(state.workdir),
-        # Local pipeline = open-source tulbase core only (no Q-protective).
-        # Q-protective ranking + epistemic markers run server-side (/v1/tul1).
+        # Local pipeline = open-source tulbase core only.
+        # The paid TUL 2.0 layer (query-aware retrieval) runs server-side (/v1/tul2).
         # Report the LOCAL pipeline's real state, not a hardcoded flag.
         "protect_mode_active": getattr(state.pipeline.summarizer, "protect_mode", "off"),
         "q_classifier_enabled": state.pipeline.q_classifier is not None,

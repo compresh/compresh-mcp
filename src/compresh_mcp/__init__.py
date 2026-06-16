@@ -2,13 +2,14 @@
 
 Bundles the open-source tulbase compression core (MIT, vendored as
 ``compresh_mcp.tulbase``) and calls the Compresh server for the
-proprietary TUL 1.0 layer:
+proprietary TUL 2.0 paid layer:
 
-    - Q-protective sentence ranking (Q1-Q4 categorization)
-    - Epistemic marker classification (VR/HR/CR/UC)
-    - Semantic store (cross-turn Q3 dedup)
+    - Query-aware retrieval over full history (MiniLM cosine)
+    - Role-preserving render (source attribution)
+    - (TUL 1.0 Q-matrix / epistemic was retired 15 Jun 2026; the value
+      lives in retrieval, not message-level tags.)
 
-TUL 1.0 layers run server-side via ``/v1/tul1`` and require a valid
+The TUL 2.0 layer runs server-side via ``/v1/tul2`` and requires a valid
 Compresh API key. Local compression (LexRank + Protection Zone +
 modality elision) always runs from the vendored tulbase core — when
 the server is unreachable, compresh-mcp degrades gracefully to local
@@ -35,11 +36,17 @@ Architecture history:
         clean DuckDB shutdown (prevents ``log.duckdb.wal`` corruption
         on host restart), onboarding URL fix
         (``api.compre.sh`` → ``compre.sh``).
+
+    0.3.0 (2026-06-16) — follows the server endpoint rename to the
+        canonical ``/v1/tul2`` (TUL 1.0 Q-matrix retired in the 15 Jun
+        retrieval pivot; the paid path is TUL 2.0 query-aware retrieval).
+        Internal ``tul1_client`` → ``tul2_client``. The server keeps
+        ``/v1/tul1`` as a deprecated alias, so older clients keep working.
 """
 
 from . import tulbase
 
-__version__ = "0.2.5"
+__version__ = "0.3.0"
 __author__ = "Compresh Ltd"
 __license__ = "BUSL-1.1"
 

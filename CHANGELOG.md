@@ -7,6 +7,23 @@ versions follow [SemVer](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-06-16
+
+### Changed
+
+- **Paid endpoint renamed to the canonical `/v1/tul2`.** The server retired
+  the TUL 1.0 Q-matrix stack in the 15 Jun 2026 retrieval pivot; the paid path
+  is now **TUL 2.0 query-aware retrieval** (relevant older turns pulled from
+  full history via MiniLM cosine, role-preserving render). The client now calls
+  `/v1/tul2`. The server keeps `/v1/tul1` as a **deprecated alias**, so
+  installs of `compresh-mcp < 0.3.0` keep working until the alias is dropped.
+- **Internal rename:** `tul1_client` → `tul2_client` (`call_v1_tul1` →
+  `call_v1_tul2`, `Tul1*` errors → `Tul2*`). Tool-response keys
+  `tul1_server_used` → `tul2_server_used`. No change to the public MCP tool
+  surface or to local tulbase behaviour.
+- Docs/metadata updated from "Q-protective ranking + epistemic markers" to
+  "TUL 2.0 query-aware retrieval".
+
 ## [0.2.5] — 2026-06-09
 
 ### Changed

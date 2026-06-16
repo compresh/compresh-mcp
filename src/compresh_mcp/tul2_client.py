@@ -1,15 +1,23 @@
-"""HTTP client for the Compresh /v1/tul1 server-side enhancement endpoint.
+"""HTTP client for the Compresh /v1/tul2 server-side enhancement endpoint.
 
-`compresh-mcp >= 0.2.0` runs the open-source tulbase compression core
+`compresh-mcp >= 0.3.0` runs the open-source tulbase compression core
 locally (LexRank summarization, Protection Zone, modality elision) and
-optionally enhances the result via the paid `/v1/tul1` endpoint when a
+optionally enhances the result via the paid `/v1/tul2` endpoint when a
 valid Compresh API key is configured.
 
-The TUL 1.0 layers (Q-protective ranking, epistemic markers, semantic
-store) live exclusively on the Compresh server in 0.2.0+. This is a
-deliberate architectural change from 0.1.0, which shipped those layers
-in the client package — that 0.1.0 distribution leaked paid features
-into the local install. See `archive/0.1.0-tul1/README.md` for context.
+The TUL 2.0 paid layer (query-aware retrieval over full history, role-
+preserving render) runs exclusively on the Compresh server. The local
+package ships tulbase only — the paid layer never lives client-side.
+
+Endpoint history:
+  - 0.1.0 shipped the (now-retired) TUL 1.0 classifiers locally — an
+    architectural mistake that leaked paid features. See
+    `archive/0.1.0-tul1/README.md`.
+  - 0.2.x moved the paid layer server-side behind `/v1/tul1`.
+  - 0.3.0 follows the server rename to the canonical `/v1/tul2`
+    (TUL 1.0 Q-matrix was retired in the 15 Jun 2026 retrieval pivot;
+    the paid path is now query-aware retrieval = TUL 2.0). The server
+    keeps `/v1/tul1` as a deprecated alias for older clients.
 """
 
 from __future__ import annotations
@@ -20,15 +28,15 @@ from typing import Any, Optional
 
 import httpx
 
-logger = logging.getLogger("compresh-mcp.tul1")
+logger = logging.getLogger("compresh-mcp.tul2")
 
 DEFAULT_TIMEOUT = 15.0
 DEFAULT_API_BASE = "https://api.compre.sh"
 
 
 @dataclass(slots=True)
-class Tul1Result:
-    """Successful /v1/tul1 response, unpacked for the MCP server to consume."""
+class Tul2Result:
+    """Successful /v1/tul2 response, unpacked for the MCP server to consume."""
 
     ok: bool
     applied: bool
@@ -46,12 +54,12 @@ class Tul1Result:
     version: str
 
 
-class Tul1Error(Exception):
-    """Base class for /v1/tul1 client errors."""
+class Tul2Error(Exception):
+    """Base class for /v1/tul2 client errors."""
 
 
-class Tul1PaymentRequired(Tul1Error):
-    """HTTP 402 — caller's tier / budget does not entitle TUL 1.0 access."""
+class Tul2PaymentRequired(Tul2Error):
+    """HTTP 402 — caller's tier / budget does not entitle TUL 2.0 access."""
 
     def __init__(self, message: str, *, your_tier: str, budget_cents: int):
         super().__init__(message)
@@ -59,15 +67,15 @@ class Tul1PaymentRequired(Tul1Error):
         self.budget_cents = budget_cents
 
 
-class Tul1NetworkError(Tul1Error):
+class Tul2NetworkError(Tul2Error):
     """Transport-level failure — caller falls back to local result."""
 
 
-class Tul1ServerError(Tul1Error):
+class Tul2ServerError(Tul2Error):
     """Server returned 5xx — caller falls back to local result."""
 
 
-async def call_v1_tul1(
+async def call_v1_tul2(
     *,
     api_key: str,
     session_id: str,
@@ -77,22 +85,22 @@ async def call_v1_tul1(
     model_hint: Optional[str] = None,
     api_base: str = DEFAULT_API_BASE,
     timeout: float = DEFAULT_TIMEOUT,
-) -> Tul1Result:
-    """Call the Compresh /v1/tul1 server-side enhancement endpoint.
+) -> Tul2Result:
+    """Call the Compresh /v1/tul2 server-side enhancement endpoint.
 
     Raises:
-        Tul1PaymentRequired: HTTP 402 — caller's tier / budget rejected.
+        Tul2PaymentRequired: HTTP 402 — caller's tier / budget rejected.
             The MCP server should surface this in the tool response so
             the user knows why they're not getting enhanced compression.
-        Tul1NetworkError: transport failure. Caller falls back to local
+        Tul2NetworkError: transport failure. Caller falls back to local
             tulbase result silently (degraded mode).
-        Tul1ServerError: HTTP 5xx. Caller falls back to local result.
+        Tul2ServerError: HTTP 5xx. Caller falls back to local result.
 
     Network and server errors are NOT fatal — paid users always have a
     valid local fallback because the open-source tulbase core ships in
     the same package.
     """
-    url = f"{api_base.rstrip('/')}/v1/tul1"
+    url = f"{api_base.rstrip('/')}/v1/tul2"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -111,37 +119,37 @@ async def call_v1_tul1(
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(url, headers=headers, json=body)
     except httpx.HTTPError as e:
-        logger.warning("[/v1/tul1] network error: %s — falling back to local", e)
-        raise Tul1NetworkError(f"network: {type(e).__name__}: {e}") from e
+        logger.warning("[/v1/tul2] network error: %s — falling back to local", e)
+        raise Tul2NetworkError(f"network: {type(e).__name__}: {e}") from e
 
     if resp.status_code == 402:
         try:
             data = resp.json()
         except Exception:
             data = {}
-        raise Tul1PaymentRequired(
-            data.get("error", "TUL 1.0 requires Pro subscription or budget > $0"),
+        raise Tul2PaymentRequired(
+            data.get("error", "TUL 2.0 requires Pro subscription or budget > $0"),
             your_tier=data.get("your_tier", "unknown"),
             budget_cents=data.get("your_budget_cents", 0),
         )
 
     if 500 <= resp.status_code < 600:
         logger.warning(
-            "[/v1/tul1] server %d — falling back to local: %s",
+            "[/v1/tul2] server %d — falling back to local: %s",
             resp.status_code, resp.text[:200],
         )
-        raise Tul1ServerError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+        raise Tul2ServerError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 
     if resp.status_code != 200:
         # 4xx other than 402 — log and treat as fall-back. Don't crash.
         logger.warning(
-            "[/v1/tul1] unexpected %d — falling back to local: %s",
+            "[/v1/tul2] unexpected %d — falling back to local: %s",
             resp.status_code, resp.text[:200],
         )
-        raise Tul1NetworkError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+        raise Tul2NetworkError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 
     data = resp.json() if resp.content else {}
-    return Tul1Result(
+    return Tul2Result(
         ok=bool(data.get("ok")),
         applied=bool(data.get("applied")),
         tier=data.get("tier"),
@@ -155,5 +163,5 @@ async def call_v1_tul1(
         protection_mode=data.get("protection_mode") or protection_mode,
         fee_cents=float(data.get("fee_cents") or 0.0),
         tier_label=data.get("tier_label"),
-        version=data.get("version") or "tul1-v?",
+        version=data.get("version") or "tul2-v?",
     )

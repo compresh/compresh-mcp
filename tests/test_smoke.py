@@ -2,7 +2,7 @@
 
 These tests run without network access and without a real Compresh API
 key — they verify the package imports cleanly, tulbase vendored
-correctly, the /v1/tul1 HTTP client is wired up, and the MCP tool
+correctly, the /v1/tul2 HTTP client is wired up, and the MCP tool
 schemas are present. Integration tests against the live Compresh API
 live in a separate suite.
 """
@@ -42,21 +42,21 @@ def test_tulbase_vendored_importable() -> None:
     assert compose_compresh_history is not None
 
 
-def test_tul1_client_importable() -> None:
-    """tul1_client module — HTTP client for /v1/tul1 server endpoint."""
-    from compresh_mcp.tul1_client import (
-        Tul1NetworkError,
-        Tul1PaymentRequired,
-        Tul1Result,
-        Tul1ServerError,
-        call_v1_tul1,
+def test_tul2_client_importable() -> None:
+    """tul2_client module — HTTP client for /v1/tul2 server endpoint."""
+    from compresh_mcp.tul2_client import (
+        Tul2NetworkError,
+        Tul2PaymentRequired,
+        Tul2Result,
+        Tul2ServerError,
+        call_v1_tul2,
     )
 
-    assert callable(call_v1_tul1)
-    assert Tul1Result is not None
-    assert issubclass(Tul1PaymentRequired, Exception)
-    assert issubclass(Tul1NetworkError, Exception)
-    assert issubclass(Tul1ServerError, Exception)
+    assert callable(call_v1_tul2)
+    assert Tul2Result is not None
+    assert issubclass(Tul2PaymentRequired, Exception)
+    assert issubclass(Tul2NetworkError, Exception)
+    assert issubclass(Tul2ServerError, Exception)
 
 
 def test_tul1_namespace_removed() -> None:

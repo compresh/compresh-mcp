@@ -1,8 +1,8 @@
 <svg viewBox="0 0 960 800" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,Roboto,sans-serif" role="img">
 <title>compresh-mcp akış diyagramı</title>
-<desc>compresh-mcp: tulbase 1-5 kullanıcı tarafında çalışır; tier kontrolü LexRank'tan önce. Free → 6a LexRank local. Paid → LexRank'sız sunucuya /v1/tul1 (LexRank 9'da). Tagsız sonuç kullanıcıya, modele kullanıcı makinesinden.</desc>
+<desc>compresh-mcp: tulbase 1-5 kullanıcı tarafında çalışır; tier kontrolü LexRank'tan önce. Free → 6a LexRank local. Paid → LexRank'sız sunucuya /v1/tul2 (LexRank 9'da). Tagsız sonuç kullanıcıya, modele kullanıcı makinesinden.</desc>
 
-<!-- palette: terracotta #C8553D client/tulbase · teal #1C7C8C sunucu/tul1.0 · red #9B2226 degraded · navy #2A3342 -->
+<!-- palette: terracotta #C8553D client/tulbase · teal #1C7C8C sunucu/tul2.0 · red #9B2226 degraded · navy #2A3342 -->
 <defs>
   <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2A3342"/></marker>
   <marker id="arrT" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1C7C8C"/></marker>
@@ -16,7 +16,7 @@
 <!-- legend -->
 <g font-size="11" fill="#374151">
   <rect x="640" y="22" width="14" height="14" rx="3" fill="#C8553D"/><text x="660" y="33">client / tulbase</text>
-  <rect x="760" y="22" width="14" height="14" rx="3" fill="#1C7C8C"/><text x="780" y="33">sunucu / tul1.0</text>
+  <rect x="760" y="22" width="14" height="14" rx="3" fill="#1C7C8C"/><text x="780" y="33">sunucu / tul2.0</text>
   <line x1="642" y1="50" x2="656" y2="50" stroke="#9B2226" stroke-width="2.5" stroke-dasharray="4 3"/><text x="660" y="54">degraded</text>
 </g>
 
@@ -60,7 +60,7 @@
 <!-- merge: tagless context -->
 <rect x="60" y="514" width="468" height="52" rx="8" fill="#fff" stroke="#C8553D" stroke-width="1.6"/>
 <text x="294" y="536" font-size="13" font-weight="700" fill="#2A3342" text-anchor="middle">Tagsız sıkıştırılmış bağlam</text>
-<text x="294" y="554" font-size="10.5" fill="#6B7280" text-anchor="middle">free → 6a sonucu · paid → /v1/tul1 sonucu</text>
+<text x="294" y="554" font-size="10.5" fill="#6B7280" text-anchor="middle">free → 6a sonucu · paid → /v1/tul2 sonucu</text>
 <line x1="294" y1="566" x2="294" y2="588" stroke="#2A3342" stroke-width="1.5" marker-end="url(#arr)"/>
 
 <!-- model provider -->
@@ -73,7 +73,7 @@
 <rect x="60" y="664" width="468" height="104" rx="8" fill="#fff" stroke="#C8553D" stroke-width="1.2" stroke-dasharray="5 3"/>
 <text x="76" y="684" font-size="12" font-weight="700" fill="#C8553D">EKLENECEK (bu hizalama)</text>
 <text x="76" y="704" font-size="11" fill="#374151">1 · Tier kontrolü LexRank'tan ÖNCE: Hayır → 6a (client),</text>
-<text x="76" y="720" font-size="11" fill="#374151">     Evet → LexRank'a girme, /v1/tul1'e gönder (LexRank 9'da)</text>
+<text x="76" y="720" font-size="11" fill="#374151">     Evet → LexRank'a girme, /v1/tul2'e gönder (LexRank 9'da)</text>
 <text x="76" y="740" font-size="11" fill="#374151">2 · Modele gitmeden tag temizliği — sunucu zaten tagsız;</text>
 <text x="76" y="756" font-size="11" fill="#374151">     client tulbase render'ı da tagsız (Q-kalıntısı kaldır)</text>
 
@@ -82,7 +82,7 @@
 <text x="612" y="294" font-size="13" font-weight="700" fill="#1C7C8C">COMPRESH SUNUCU (api.compre.sh)</text>
 
 <rect x="612" y="306" width="304" height="170" rx="8" fill="#fff" stroke="#1C7C8C" stroke-width="1.4"/>
-<text x="764" y="327" font-size="13" font-weight="700" fill="#1C7C8C" text-anchor="middle">POST /v1/tul1  (TUL 1.0 — paid)</text>
+<text x="764" y="327" font-size="13" font-weight="700" fill="#1C7C8C" text-anchor="middle">POST /v1/tul2  (TUL 2.0 — paid)</text>
 <text x="764" y="343" font-size="10" fill="#6B7280" text-anchor="middle">API key + tier gate · LexRank'sız girdi alır</text>
 <text x="764" y="367" font-size="11" fill="#374151" text-anchor="middle">6 Q-matrix (Q1–Q4)</text>
 <text x="764" y="385" font-size="11" fill="#374151" text-anchor="middle">7 Semantic dedup → anchor</text>

@@ -2,20 +2,24 @@
 
 **MCP server for Compresh** — production-grade context compression for LLM agent conversations.
 
-> Compresh adds Q-protective ranking, epistemic marker classification, and
-> depth-aware adaptation on top of the open-source [`tulbase`](https://github.com/compresh/tulbase)
-> compression core. This is the **paid tier** distribution.
+> Compresh adds **query-aware retrieval (TUL 2.0)** on top of the open-source
+> [`tulbase`](https://github.com/compresh/tulbase) compression core. Instead of
+> summarizing older turns, it retrieves the turns relevant to the current
+> question — lossless and role-tagged — from the full conversation history.
+> This is the **paid tier** distribution.
 
-## Architecture (0.2.0+)
+## Architecture (0.3.0+)
 
 - **Local**: bundled `tulbase` (MIT, vendored as `compresh_mcp.tulbase`) runs on every turn for fast compression + cold-storage support (`fetch_compressed` / `list_compressed` MCP tools).
-- **Server**: TUL 1.0 layers (Q-protective ranking, epistemic markers, semantic store) run on Compresh infrastructure via the `/v1/tul1` endpoint, gated by your Compresh API key + tier.
-- **Degraded mode**: if `/v1/tul1` is unreachable, compresh-mcp transparently falls back to the local tulbase result so compression never blocks.
+- **Server**: the **TUL 2.0** paid layer (query-aware retrieval over full history, role-preserving render) runs on Compresh infrastructure via the `/v1/tul2` endpoint, gated by your Compresh API key + tier.
+- **Degraded mode**: if `/v1/tul2` is unreachable, compresh-mcp transparently falls back to the local tulbase result so compression never blocks.
 
-Previously (0.1.0, yanked), TUL 1.0 classifiers shipped inside the client
-package. That distribution leaked paid features into the local install
-and is no longer recommended — install 0.2.0 or later. See
-[CHANGELOG.md](./CHANGELOG.md) for the migration note.
+The paid endpoint was the legacy `/v1/tul1` through 0.2.x; 0.3.0 calls the
+canonical `/v1/tul2` (the TUL 1.0 Q-matrix layer was retired in the 15 Jun
+2026 retrieval pivot). The server keeps `/v1/tul1` as a deprecated alias, so
+older clients keep working. Previously (0.1.0, yanked), paid classifiers
+shipped inside the client package and leaked paid features locally — install
+0.3.0 or later. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## What's the difference vs `tulbase-mcp`?
 

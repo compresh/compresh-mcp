@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "compresh-mcp"
-version = "0.2.5"
-description = "MCP server for Compresh — production-grade context compression with Q-protective ranking, epistemic markers, and depth-aware adaptation"
+version = "0.3.0"
+description = "MCP server for Compresh — production-grade context compression with TUL 2.0 query-aware retrieval (paid tier) over the open tulbase core"
 readme = "README.md"
 license = { text = "BUSL-1.1" }
 authors = [
@@ -18,8 +18,8 @@ keywords = [
     "agent",
     "context-compression",
     "compresh",
-    "q-protective",
-    "epistemic",
+    "retrieval",
+    "tulbase",
     "tulving",
 ]
 classifiers = [
