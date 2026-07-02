@@ -78,9 +78,20 @@ class AuthResult:
 
 
 def get_api_key() -> Optional[str]:
-    """Read COMPRESH_API_KEY from environment, return None if missing/empty."""
+    """Read COMPRESH_API_KEY from environment; fall back to ~/.compresh/apikey (written by
+    `compresh-mcp signup`, funnel §9). Returns None if neither is set."""
     key = (os.environ.get("COMPRESH_API_KEY") or "").strip()
-    return key or None
+    if key:
+        return key
+    try:
+        from pathlib import Path
+        p = Path.home() / ".compresh" / "apikey"
+        if p.exists():
+            k = p.read_text().strip()
+            return k or None
+    except Exception:
+        pass
+    return None
 
 
 def verify_api_key(

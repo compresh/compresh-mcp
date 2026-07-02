@@ -293,6 +293,12 @@ async def tool_compress(
                 "/v1/tul2 payment required (your_tier=%s, budget_cents=%d) — using local result",
                 e.your_tier, e.budget_cents,
             )
+            # Funnel §9: trial ended / no budget → one-time nudge (stderr). Keeps serving local tulbase.
+            try:
+                from .onboarding import show_trial_expired_nudge
+                show_trial_expired_nudge()
+            except Exception:
+                pass
         except (Tul2NetworkError, Tul2ServerError) as e:
             tul2_error = str(e)
             logger.warning("/v1/tul2 unavailable — using local result: %s", e)
@@ -715,8 +721,13 @@ def _bootstrap_auth() -> AuthResult:
         )
         return result
     except NoApiKey:
-        show_welcome_and_open_signup()
-        sys.exit(2)
+        # Funnel §9: NO key → run TULBASE-FULL locally (free tier), do NOT exit. Show the
+        # first-run onboarding once (explains tulbase vs TUL 2.0 + `compresh-mcp signup`), serve.
+        from .onboarding import show_first_run_onboarding
+        _auth = AuthResult(ok=True, api_key="", tier="free")
+        show_first_run_onboarding()
+        logger.info("no api key — running free local tulbase (tier=free)")
+        return _auth
     except InvalidApiKey as e:
         print(f"\nCompresh API key was rejected: {e}", file=sys.stderr)
         print("Check your COMPRESH_API_KEY value, or visit "
@@ -747,7 +758,7 @@ async def serve() -> None:
             read_stream, write_stream,
             InitializationOptions(
                 server_name="compresh-mcp",
-                server_version="0.2.4",
+                server_version="0.3.2",
                 capabilities=app.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},
@@ -809,6 +820,15 @@ def main() -> None:
         level=logging.INFO if verbose else logging.WARNING,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
+    # CLI subcommands: `compresh-mcp signup <email>` (funnel §9),
+    #                  `compresh-mcp login [--github|--google]` (funnel §10, device flow).
+    _args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if _args and _args[0] == "signup":
+        from .onboarding import cli_signup
+        sys.exit(cli_signup(_args[1] if len(_args) > 1 else None))
+    if _args and _args[0] == "login":
+        from .onboarding import cli_login_oauth
+        sys.exit(cli_login_oauth("google" if "--google" in sys.argv else "github"))
     _install_lifecycle_handlers()
     _bootstrap_auth()
     asyncio.run(serve())
