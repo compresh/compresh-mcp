@@ -69,8 +69,12 @@ See [compre.sh/pricing](https://compre.sh/pricing) for the canonical pricing pag
 ## Installation
 
 ```bash
-pip install compresh-mcp
+pipx install compresh-mcp     # recommended — isolated, works out of the box
 ```
+
+(No pipx? `brew install pipx` on macOS. Plain `pip install compresh-mcp`
+works inside a virtualenv, but on Homebrew/Debian system Python it hits
+PEP 668 "externally-managed-environment" — pipx is the painless path.)
 
 **No account needed to start** — on first run compresh-mcp compresses locally
 with the free tulbase core and prints a one-time note about the upgrade path.
@@ -87,7 +91,32 @@ automatically. You can also set `COMPRESH_API_KEY` explicitly.
 
 ## MCP client configuration
 
-### Claude Code (`~/.claude/mcp.json`)
+### Claude Code
+
+Register via the CLI — current Claude Code does **not** read a
+hand-written `~/.claude/mcp.json`:
+
+```bash
+claude mcp add compresh --scope user \
+  --env COMPRESH_API_BASE=https://api.compre.sh \
+  -- "$(which compresh-mcp)"
+```
+
+(The server name goes right after `add` — placing it after the flags
+fails with `missing required argument 'commandOrUrl'`.)
+
+If you sign in via `compresh-mcp login` / `signup`, your key lands in
+`~/.compresh/apikey` and the server picks it up automatically — nothing
+to re-run. To pin an explicit key instead, re-run with
+`--env COMPRESH_API_KEY=sk-comp_...` appended (the entry is overwritten
+in place; omit the key to stay in free local mode). Then start a
+**new** `claude` session and check with `/mcp` — or `claude mcp list`
+from the shell.
+
+> `"$(which compresh-mcp)"` bakes in the full binary path — MCP hosts
+> don't always inherit your shell `PATH`.
+
+### Cursor (`~/.cursor/mcp.json`)
 
 ```json
 {
@@ -103,11 +132,9 @@ automatically. You can also set `COMPRESH_API_KEY` explicitly.
 }
 ```
 
-(Omit `COMPRESH_API_KEY` to run in free local mode.)
-
-### Cursor (`~/.cursor/mcp.json`)
-
-Same structure as Claude Code.
+(Omit `COMPRESH_API_KEY` to run in free local mode. If Cursor can't find
+the binary, use the full path from `which compresh-mcp` — typically
+`~/.local/bin/compresh-mcp`.)
 
 ### Cowork
 
